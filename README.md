@@ -11,8 +11,6 @@ Features
 
 The script is Linux-first (reads /proc) but includes fallbacks for macOS (Darwin). It aims to be dependency-light and usable on most servers.
 
-Files
-- `server-stats.sh` — main script
 
 Requirements
 - POSIX-compatible shell (bash recommended)
