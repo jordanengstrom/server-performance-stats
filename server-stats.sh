@@ -240,8 +240,9 @@ separator
 print_header "Top 5 processes by Memory"
 get_top_mem_processes
 
-# End
-printf "\nReport generated at: %s\n\n" "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+utc_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+local_iso="$(date +"%Y-%m-%dT%H:%M:%S %z (%Z)" 2>/dev/null || date +"%Y-%m-%dT%H:%M:%S %Z")"
+printf "\nReport generated at (same instant):\n  UTC:   %s\n  local: %s\n\n" "$utc_iso" "$local_iso"
 
 exit 0
 
