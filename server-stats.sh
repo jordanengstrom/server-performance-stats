@@ -8,18 +8,7 @@ set -euo pipefail
 OS=$(uname -s)
 
 print_header() {
-  local title="$1"
-  local width=${COLUMNS:-80}
-  local sep='='
-  local padded=" ${title} "
-  local tlen=${#padded}
-  local left_len=$(( (width - tlen) / 2 ))
-  [ "$left_len" -lt 0 ] && left_len=0
-  local right_len=$(( width - left_len - tlen ))
-  printf "\n%s%s%s\n" \
-    "$(printf '%*s' "$left_len" '' | tr ' ' "$sep")" \
-    "$padded" \
-    "$(printf '%*s' "$right_len" '' | tr ' ' "$sep")"
+  printf "\n========== %s ==========\n" "$1"
 }
 
 separator() {
@@ -193,6 +182,7 @@ get_disk_info() {
 get_top_processes_linux() {
   ps -eo pid,pcpu,pmem,user,comm --sort=-pcpu | awk 'NR==1{print; next} NR>1 && NR<=6{print}'
 }
+
 get_top_processes_darwin() {
   # BSD-style ps flags
   ps -axo pid,pcpu,pmem,user,comm | awk 'NR==1{print; next} NR>1 && NR<=6{print}'
@@ -201,6 +191,7 @@ get_top_processes_darwin() {
 get_top_mem_processes_linux() {
   ps -eo pid,pcpu,pmem,user,comm --sort=-pmem | awk 'NR==1{print; next} NR>1 && NR<=6{print}'
 }
+
 get_top_mem_processes_darwin() {
   ps -axo pid,pcpu,pmem,user,comm | awk 'NR==1{print; next} NR>1 && NR<=6{print}'
 }
@@ -212,6 +203,7 @@ get_top_processes() {
     *) get_top_processes_linux ;;
   esac
 }
+
 get_top_mem_processes() {
   case "$OS" in
     Linux) get_top_mem_processes_linux ;;
@@ -220,26 +212,96 @@ get_top_mem_processes() {
   esac
 }
 
-# Main output
+# 5) OS Version
+get_os_version() {
+  case "$OS" in
+    Linux)
+      if [ -r /etc/os-release ]; then
+        . /etc/os-release
+        # Prefer a readable name + version
+        printf "%s %s" "${NAME:-Linux}" "${VERSION_ID:-${VERSION:-}}"
+        return 0
+      fi
+      if command -v lsb_release >/dev/null 2>&1; then
+        lsb_release -ds
+        return 0
+      fi
+      uname -r
+      ;;
+    Darwin)
+      product=$(sw_vers -productName 2>/dev/null || echo "macOS")
+      ver=$(sw_vers -productVersion 2>/dev/null || uname -r)
+      printf "%s %s" "$product" "$ver"
+      ;;
+    *)
+      uname -sr
+      ;;
+  esac
+}
+
+# 6) Failed login attempts
+get_failed_logins() {
+  found=false
+
+  # Check systemd journal (if available)
+  if command -v journalctl >/dev/null 2>&1; then
+    # Searching system journal:
+    if sudo journalctl _COMM=sshd --since "3 days ago" | grep -i "failed" | tee /tmp/failed_logins.tmp | grep -q .; then
+      cat /tmp/failed_logins.tmp
+      found=true
+    fi
+  fi
+
+  # Fallback: search auth or secure logs
+  if [ "$found" = false ]; then
+    # Searching /var/log/auth.log and /var/log/secure:
+    if sudo grep -i "failed password" /var/log/auth.log* /var/log/secure* 2>/dev/null | tee /tmp/failed_logins.tmp | grep -q .; then
+      cat /tmp/failed_logins.tmp
+      found=true
+    fi
+  fi
+
+  # Fallback: check btmp with lastb
+  if [ "$found" = false ] && command -v lastb >/dev/null 2>&1; then
+    # Checking /var/log/btmp:
+    if sudo lastb | tee /tmp/failed_logins.tmp | grep -q .; then
+      cat /tmp/failed_logins.tmp
+      found=true
+    fi
+  fi
+
+  # If still nothing found
+  if [ "$found" = false ]; then
+    echo "No failed login attempts found in the past 3 days."
+  fi
+
+  # Cleanup
+  rm -f /tmp/failed_logins.tmp
+}
+
+# 7) Additional Info
+# Output of the `w` command
+
+# Begin report output
 print_header "Server Performance Summary (OS: $OS)"
 
 # CPU
-cpu_usage=$(get_cpu_usage || echo "0.0")
-printf "Total CPU usage: %s%%\n" "$cpu_usage"
+cpu_usage=$(get_cpu_usage)
+printf "Total CPU Usage: %s%%\n\n" "$cpu_usage"
 separator
 
 # Memory
 print_header "Memory"
 mem_info=$(get_memory_info)
 IFS='|' read -r mem_total_h mem_used_h mem_free_h mem_used_pct <<<"$mem_info"
-printf "Total: %s\nUsed:  %s (%s%%)\nFree:  %s\n" "$mem_total_h" "$mem_used_h" "$mem_used_pct" "$mem_free_h"
+printf "Total: %s\nUsed:  %s (%s%%)\nFree:  %s\n\n" "$mem_total_h" "$mem_used_h" "$mem_used_pct" "$mem_free_h"
 separator
 
 # Disk
 print_header "Disk (aggregated/primary)"
 disk_info=$(get_disk_info)
 IFS='|' read -r disk_total_h disk_used_h disk_free_h disk_used_pct <<<"$disk_info"
-printf "Total: %s\nUsed:  %s (%s)\nFree:  %s\n" "$disk_total_h" "$disk_used_h" "$disk_used_pct" "$disk_free_h"
+printf "Total: %s\nUsed:  %s (%s)\nFree:  %s\n\n" "$disk_total_h" "$disk_used_h" "$disk_used_pct" "$disk_free_h"
 separator
 
 # Top processes by CPU
@@ -250,10 +312,28 @@ separator
 # Top processes by Memory
 print_header "Top 5 processes by Memory"
 get_top_mem_processes
+separator
 
+# OS Version
+os_version="$(get_os_version || true)"
+print_header "OS Version"
+printf "%s\n" "$os_version"
+separator
+
+print_header "Failed Login Attempts"
+get_failed_logins
+separator
+
+# Additional info:
+print_header "Additional Info"
+w
+separator
+
+print_header "Report Generation Time"
 utc_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 local_iso="$(date +"%Y-%m-%dT%H:%M:%S %z (%Z)" 2>/dev/null || date +"%Y-%m-%dT%H:%M:%S %Z")"
-printf "\nReport generated at (same instant):\n  UTC:   %s\n  local: %s\n\n" "$utc_iso" "$local_iso"
+printf "UTC: %s\nlocal: %s\n" "$utc_iso" "$local_iso"
+separator
 
 exit 0
-
+# End report output
