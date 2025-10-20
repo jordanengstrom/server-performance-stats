@@ -36,20 +36,20 @@ chmod +x server-stats.sh
 Example output (trimmed):
 
 ```
-== Server Performance Summary (OS: Linux) ==
+========== Server Performance Summary (OS: Linux) ==========
 Total CPU usage: 7.2%
 
-== Memory ==
+========== Memory ==========
 Total: 15.56 GiB
 Used:  3.12 GiB (20.0%)
 Free:  12.44 GiB
 
-== Disk (aggregated/primary) ==
+========== Disk (aggregated/primary) ==========
 Total: 250.00 GiB
 Used:  30.50 GiB (12%)
 Free:  219.50 GiB
 
-== Top 5 processes by CPU ==
+========== Top 5 processes by CPU ==========
 PID  %CPU %MEM USER  COMM
 ... (top 5 rows) ...
 ```
@@ -57,7 +57,6 @@ PID  %CPU %MEM USER  COMM
 Running regularly (cron)
 
 To run every 5 minutes and append output to a log:
-
 ```bash
 # edit root or your user's crontab: crontab -e
 */5 * * * * /path/to/server-stats.sh >> /var/log/server-stats.log 2>&1
@@ -67,14 +66,3 @@ Notes and troubleshooting
 - Linux systems: the script reads `/proc/stat` and `/proc/meminfo` for accurate CPU and memory metrics.
 - macOS: the script parses `top`, `vm_stat`, and `sysctl`. macOS `top` output formats can vary across versions and locales — if CPU% appears incorrect on macOS, inspect `top -l 2 -s 0.5 | grep "CPU usage"` to see how your system prints CPU usage.
 - Containers/minimal images: some minimal containers may lack `ps`, `df`, or `/proc` entries; the script will print `N/A` or fall back to available tools when that happens.
-
-Extending the script
-- Add a `--json` flag to emit machine-readable output for integration with monitoring systems.
-- Add a `--sample` or `--interval` flag to control CPU sampling duration.
-
-License
-MIT
-
-Contributions
-PRs and issues are welcome — open a PR in this repository.
-
