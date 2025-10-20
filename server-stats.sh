@@ -8,7 +8,18 @@ set -euo pipefail
 OS=$(uname -s)
 
 print_header() {
-  printf "\n========== %s ==========\n" "$1"
+  local title="$1"
+  local width=${COLUMNS:-80}
+  local sep='='
+  local padded=" ${title} "
+  local tlen=${#padded}
+  local left_len=$(( (width - tlen) / 2 ))
+  [ "$left_len" -lt 0 ] && left_len=0
+  local right_len=$(( width - left_len - tlen ))
+  printf "\n%s%s%s\n" \
+    "$(printf '%*s' "$left_len" '' | tr ' ' "$sep")" \
+    "$padded" \
+    "$(printf '%*s' "$right_len" '' | tr ' ' "$sep")"
 }
 
 separator() {
