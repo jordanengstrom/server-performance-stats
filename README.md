@@ -2,7 +2,7 @@
 
 Lightweight shell script to report basic server performance statistics.
 
-Features
+## Features
 - Total CPU usage
 - Total memory usage (Used vs Free + percentage)
 - Total disk usage (Used vs Free + percentage)
@@ -12,21 +12,18 @@ Features
 The script is Linux-first (reads /proc) but includes fallbacks for macOS (Darwin). It aims to be dependency-light and usable on most servers.
 
 
-Requirements
+## Requirements
 - POSIX-compatible shell (bash recommended)
 - Common system utilities: `ps`, `df`, `awk`, `sed`, `top`, `vm_stat` (macOS), `sysctl` (macOS)
 - `numfmt` (optional) improves human-readable memory/disk formatting; the script falls back to simple units if `numfmt` is missing.
 
-Quick start
-
+## Quick start
 1. Make the script executable:
-
 ```bash
 chmod +x server-stats.sh
 ```
 
 2. Run it:
-
 ```bash
 ./server-stats.sh
 ```
@@ -52,15 +49,19 @@ PID  %CPU %MEM USER  COMM
 ... (top 5 rows) ...
 ```
 
-Running regularly (cron)
-
-To run every 5 minutes and append output to a log:
-```bash
-# edit root or your user's crontab: crontab -e
-*/5 * * * * /path/to/server-stats.sh >> /var/log/server-stats.log 2>&1
-```
-
-Notes and troubleshooting
+## Notes and troubleshooting
 - Linux systems: the script reads `/proc/stat` and `/proc/meminfo` for accurate CPU and memory metrics.
 - macOS: the script parses `top`, `vm_stat`, and `sysctl`. macOS `top` output formats can vary across versions and locales — if CPU% appears incorrect on macOS, inspect `top -l 2 -s 0.5 | grep "CPU usage"` to see how your system prints CPU usage.
 - Containers/minimal images: some minimal containers may lack `ps`, `df`, or `/proc` entries; the script will print `N/A` or fall back to available tools when that happens.
+
+## Testing within a Linux image:
+```bash
+# Build docker image
+docker build --debug --no-cache --tag debian-server:latest .
+
+# Run docker container
+docker run -it --name debian-server debian-server:latest /bin/bash
+
+# Run script
+./server-stats.sh
+```
